@@ -25,6 +25,14 @@ const BG_COLOR_NORMAL = 1;
 const BG_COLOR_TOUCHING = 2;
 const BG_COLOR_INCORRECT = 3;
 
+const RATE_STEP_DURATION = 20;
+const MAX_STEP_DURATION = 200;
+const MIN_STEP_DURATION = 100;
+
+const MIN_STEPS_NUMBER = 10;
+const MIN_GRID = 1;
+const MAX_GRID = 9;
+
 class Grid extends Component {
 	state = {
 		bgColor: BG_COLOR_NORMAL,
@@ -284,6 +292,53 @@ export default class GridGame extends Component<Props> {
 				this.setStatus(STATUS_WAITING);
 			}
 		}
+	}
+
+	setUpLevel() {
+		let stepDuration = this.getStepDuration();
+	}
+
+	getStepDuration() {
+		let rate = 0;
+		let levelRate = parseInt(this.state.level / 2);
+		switch (levelRate) {
+			case 1: rate = 0; break;
+			case 2: rate = 1; break;
+			case 3: rate = 2; break;
+			case 4: rate = 3; break;
+			case 5: rate = 4; break;
+			case 6: rate = 5; break;
+			default: rate = 5; break;
+		}
+
+		return MAX_STEP_DURATION - RATE_STEP_DURATION * rate;
+    }
+
+    getSteps() {
+        // steps: {
+         //    1: 1,
+         //        2: 2,
+         //        3: 3,
+         //        4: 6,
+         //        5: 9,
+         //        6: 8,
+         //        7: 7,
+         //        8: 4,
+         //        9: 5,
+         //        10: 4,
+         //        11: 7,
+         //        12: 8,
+         //        13: 9,
+         //        14: 6,
+         //        15: 3,
+         //        16: 2,
+        // },
+        //
+		// let steps = {};
+        //
+        // for (let i = MIN_GRID; i <= MAX_GRID; i++) {
+        //
+		// }
 	}
 
 	render() {
