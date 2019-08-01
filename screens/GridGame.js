@@ -374,31 +374,45 @@ export default class GridGame extends Component<Props> {
 
 const styles = {
 	container: {
-		flex: 1,
-		padding: 15,
+		width: '100%',
+		height: '100%',
 	},
     score_area_bound: {
-    	marginBottom: 30,
     	alignItems: 'center',
+    	justifyContent: 'center',
+    	height: '10%',
+    	width: '100%',
     },
     score_area: {
     	flexDirection: 'row',
     	justifyContent: 'space-between',
-    	width: 300,
+    	width: '90%',
     },
     grid_area_bound: {
+    	alignItems: 'center',
     	justifyContent: 'center',
+    	width: '100%',
+    	height: '70%',
     },
     grid_area: {
  		justifyContent: 'center',
         alignItems: 'center',
         alignContent: 'center',
   		backgroundColor: '#6c757d',
-  		padding: 10,
+  		// padding: 10,
   		flexWrap: 'wrap',
-  		width: 330,
-        height:330,
+  		width: '90%',
+        aspectRatio: 1 / 1,
         margin:'auto',
+    },
+    grid: {
+    	width: '30%',
+    	// height: 100,
+    	aspectRatio: 1 / 1,
+        borderColor: 'black',
+        borderWidth: 1,
+        borderStyle: 'solid',
+        // position: 'relative',
     },
     level: {
     	fontSize: 20,
@@ -416,14 +430,6 @@ const styles = {
     },
     bg_incorrect: {
 		backgroundColor: 'red',
-    },
-    grid: {
-    	width: 100,
-    	height: 100,
-        borderColor: 'black',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        position: 'relative',
     },
     btn_area_bound: {
     	marginTop: 30,
