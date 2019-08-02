@@ -26,10 +26,10 @@ const BG_COLOR_TOUCHING = 2;
 const BG_COLOR_INCORRECT = 3;
 
 const RATE_STEP_DURATION = 20;
-const MAX_STEP_DURATION = 200;
+const MAX_STEP_DURATION = 800;
 const MIN_STEP_DURATION = 100;
 
-const MIN_STEPS_NUMBER = 10;
+const MIN_STEPS_NUMBER = 5;
 const MIN_GRID = 1;
 const MAX_GRID = 9;
 
@@ -43,15 +43,11 @@ class Grid extends Component {
 			[BG_COLOR_TOUCHING]: 'bg_touching',
 			[BG_COLOR_INCORRECT]: 'bg_incorrect',
 		},
-		status: STATUS_SHOWING,
+		status: STATUS_START,
+		timerId: '',
 	};
 
 	componentDidMount() {
-		let timerId = setInterval(()=>{
-			if (this.state.status == STATUS_SHOWING) {
-				this.updateColor();
-			}
-		}, this.state.duration);
 	}
 
 	updateColor() {
@@ -89,17 +85,64 @@ class Grid extends Component {
 		} 
 	}
 
-	setStatus(status) {
-		this.setState({
+	async setStatus(status) {
+		await this.setState({
 			'status': status
 		});
 
-		if (status == STATUS_ANSWERING) {
-			this.setColor(BG_COLOR_NORMAL);
-			this.enableTouchGrid(true);
-		} else {
-			this.enableTouchGrid(false);
+		if (status == STATUS_START) {
+			this.setStartStatus();
 		}
+
+		if (status == STATUS_SHOWING) {
+			this.setShowingStatus();
+		}
+
+		if (status == STATUS_ANSWERING) {
+			this.setAnsweringStatus();
+		}
+
+		if (status == STATUS_WAITING) {
+			this.setWaitingStatus();
+		}
+
+		if (status == STATUS_FINISH) {
+			this.setFinishStatus();
+		}
+	}
+
+	setStartStatus() {
+		this.setColor(BG_COLOR_NORMAL);
+		this.enableTouchGrid(false);
+	}
+
+	async setShowingStatus() {
+		this.enableTouchGrid(false);
+
+		let timerId = setInterval(()=>{
+			if (this.state.status == STATUS_SHOWING) {
+				this.updateColor();
+			}
+		}, this.state.duration);
+
+		this.setState({
+			timerId: timerId,
+		});
+	}
+
+	setAnsweringStatus() {
+		this.setColor(BG_COLOR_NORMAL);
+		this.enableTouchGrid(true);
+
+		clearInterval(this.state.timerId);
+	}
+
+	setWaitingStatus() {
+		this.enableTouchGrid(false);
+	}
+
+	setFinishStatus() {
+		this.enableTouchGrid(false);
 	}
 
 	render() {
@@ -182,9 +225,19 @@ export default class GridGame extends Component<Props> {
 		this.setStatus(STATUS_START);
 	}
 
-	onPressBtnControl() {
+	async onPressBtnControl() {
 		if (this.state.status == STATUS_START) {
 			this.setStatus(STATUS_SHOWING);
+		}
+
+		if (this.state.status == STATUS_WAITING) {
+			await this.continue();
+			this.setStatus(STATUS_SHOWING)
+		}
+
+		if (this.state.status == STATUS_FINISH) {
+			await this.start();
+			this.setStatus(STATUS_START);
 		}
 	}
 
@@ -227,6 +280,7 @@ export default class GridGame extends Component<Props> {
 	}
 
 	setStartStatus() {
+		this.start();
 	}
 
 	async setShowingStatus() {
@@ -250,9 +304,15 @@ export default class GridGame extends Component<Props> {
 				}))
 			}
 		}, this.state.stepDuration);
+
+		await this.setState({
+			changeColorGridsTime: changeColorGridsTime,
+		});
+		console.log(this.state.changeColorGridsTime);
 	}
 
 	setAnsweringStatus() {
+		console.log(this.state.changeColorGridsTime);
 		clearInterval(this.state.changeColorGridsTime);
 	}
 
@@ -294,11 +354,37 @@ export default class GridGame extends Component<Props> {
 		}
 	}
 
-	setUpLevel() {
-		let stepDuration = this.getStepDuration();
+	async continue() {
+		await this.setState(previousState => ({
+				'level': previousState.level + 1,
+				'currentNumber': 1,
+				'currentCheckedNumber': 0,
+			}));
+
+		this.setUpLevel();
 	}
 
-	getStepDuration() {
+	async start() {
+		await this.setState(previousState => ({
+				'level': 1,
+				'currentNumber': 1,
+				'currentCheckedNumber': 0,
+			}));
+
+		await this.setUpLevel();
+	}
+
+	async setUpLevel() {
+		console.log('setup-level');
+		this.setStepDuration();
+		this.setStepsNumber();
+		this.setSteps();
+
+		console.log(this.state);
+	}
+
+	setStepDuration() {
+		console.log('get-duration');
 		let rate = 0;
 		let levelRate = parseInt(this.state.level / 2);
 		switch (levelRate) {
@@ -311,34 +397,35 @@ export default class GridGame extends Component<Props> {
 			default: rate = 5; break;
 		}
 
-		return MAX_STEP_DURATION - RATE_STEP_DURATION * rate;
+		this.setState({
+			stepDuration: MAX_STEP_DURATION - RATE_STEP_DURATION * rate,
+		});
     }
 
-    getSteps() {
-        // steps: {
-         //    1: 1,
-         //        2: 2,
-         //        3: 3,
-         //        4: 6,
-         //        5: 9,
-         //        6: 8,
-         //        7: 7,
-         //        8: 4,
-         //        9: 5,
-         //        10: 4,
-         //        11: 7,
-         //        12: 8,
-         //        13: 9,
-         //        14: 6,
-         //        15: 3,
-         //        16: 2,
-        // },
-        //
-		// let steps = {};
-        //
-        // for (let i = MIN_GRID; i <= MAX_GRID; i++) {
-        //
-		// }
+    setStepsNumber() {
+    	console.log('get-steps-number');
+    	let stepsNumber = MIN_STEPS_NUMBER;
+
+    	if (this.state.level != 1) {
+    		stepsNumber = this.state.stepsNumber + 1;
+    	}
+
+    	this.setState({
+			stepsNumber: stepsNumber,
+		});
+    }
+
+    setSteps() {
+    	console.log('get-steps');
+		let steps = {};
+        
+        for (let i = 1; i <= this.state.stepsNumber; i++) {
+        	steps[i] = MIN_GRID + Math.floor(Math.random() * (MAX_GRID - MIN_GRID));
+		}
+
+		this.setState({
+			steps: steps,
+		});
 	}
 
 	render() {
