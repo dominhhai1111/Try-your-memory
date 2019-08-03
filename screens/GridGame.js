@@ -1,23 +1,16 @@
 import * as WebBrowser from 'expo-web-browser';
 import React, {Component} from 'react';
 import {
-	StyleSheet,
+	Animated,
 	View,
-	Image,
-	Button,
-	Alert,
-	Container,
-	Row,
-	Col,
 	Text,
-	TouchableWithoutFeedback,
 	TouchableOpacity,
 	TouchableHighlight,
 } from 'react-native';
 
 const STATUS_START = 1;
 const STATUS_SHOWING = 2;
-const STATUS_ANSWERING =3;
+const STATUS_ANSWERING = 3;
 const STATUS_WAITING = 4;
 const STATUS_FINISH = 5;
 
@@ -26,44 +19,43 @@ const BG_COLOR_TOUCHING = 2;
 const BG_COLOR_INCORRECT = 3;
 
 const RATE_STEP_DURATION = 20;
-const MAX_STEP_DURATION = 800;
-const MIN_STEP_DURATION = 100;
+const MAX_STEP_DURATION = 2000;
+const MIN_STEP_DURATION = 500;
 
 const MIN_STEPS_NUMBER = 5;
 const MIN_GRID = 1;
 const MAX_GRID = 9;
+
+const COLOR_NORMAL = '#17a2b8';
+const COLOR_TOUCHING = '#ffc107';
+const COLOR_INCORRECT = '#ff0000';
+
+const ANIMATE_GRID_DURATION = 1000;
+const ANIMATE_VALUE_NORMAL_BEGIN = 0;
+const ANIMATE_VALUE_NORMAL_END = 400;
+const ANIMATE_VALUE_TOUCHING = 200;
+const ANIMATE_VALUE_INCORRECT = -1;
 
 class Grid extends Component {
 	state = {
 		bgColor: BG_COLOR_NORMAL,
 		duration: 20,
 		enableTouchGrid: false,
-		bgColors: {
-			[BG_COLOR_NORMAL]: 'bg_normal',
-			[BG_COLOR_TOUCHING]: 'bg_touching',
-			[BG_COLOR_INCORRECT]: 'bg_incorrect',
-		},
 		status: STATUS_START,
-		timerId: '',
+		animatedColor: new Animated.Value(ANIMATE_VALUE_NORMAL_BEGIN),
 	};
 
 	componentDidMount() {
 	}
 
-	updateColor() {
-		if (this.props.changeColor) {
-			this.setState(previousState => (
-				{
-					bgColor: BG_COLOR_TOUCHING,
-				}
-			));
-		} else {
-			this.setState(previousState => (
-				{
-					bgColor: BG_COLOR_NORMAL,
-				}
-			));
-		}
+	animateGrid() {
+		this.setState({
+			animatedColor: new Animated.Value(ANIMATE_VALUE_NORMAL_BEGIN),
+		});
+		Animated.timing(this.state.animatedColor, {
+			toValue: ANIMATE_VALUE_NORMAL_END,
+			duration: ANIMATE_GRID_DURATION,
+		}).start();
 	}
 
 	enableTouchGrid(enableTouchGrid) {
@@ -75,17 +67,17 @@ class Grid extends Component {
 	}
 
 	setColor(color) {
-		if (!((this.state.status == STATUS_ANSWERING || this.state.status == STATUS_FINISH) 
-			&& this.state.bgColor == BG_COLOR_INCORRECT)) {
-			this.setState(previousState => (
-				{
-					bgColor: color,
-				}
-			));
+		console.log('grid-color: ' + color);
+		if (this.state.status != STATUS_FINISH || color == ANIMATE_VALUE_INCORRECT) {
+			console.log('grid-status: ' + this.state.status);
+			this.setState({
+				animatedColor: new Animated.Value(color),
+			});
 		} 
 	}
 
 	async setStatus(status) {
+		console.log(status);
 		await this.setState({
 			'status': status
 		});
@@ -112,29 +104,17 @@ class Grid extends Component {
 	}
 
 	setStartStatus() {
-		this.setColor(BG_COLOR_NORMAL);
+		this.setColor(ANIMATE_VALUE_NORMAL_BEGIN);
 		this.enableTouchGrid(false);
 	}
 
 	async setShowingStatus() {
 		this.enableTouchGrid(false);
-
-		let timerId = setInterval(()=>{
-			if (this.state.status == STATUS_SHOWING) {
-				this.updateColor();
-			}
-		}, this.state.duration);
-
-		this.setState({
-			timerId: timerId,
-		});
 	}
 
 	setAnsweringStatus() {
-		this.setColor(BG_COLOR_NORMAL);
+		this.setColor(ANIMATE_VALUE_NORMAL_BEGIN);
 		this.enableTouchGrid(true);
-
-		clearInterval(this.state.timerId);
 	}
 
 	setWaitingStatus() {
@@ -146,23 +126,42 @@ class Grid extends Component {
 	}
 
 	render() {
-		const gridStyle = styles[this.state.bgColors[this.state.bgColor]];
+		const interpolatedColor = this.state.animatedColor.interpolate({
+			inputRange: [
+				ANIMATE_VALUE_INCORRECT, 
+				ANIMATE_VALUE_NORMAL_BEGIN, 
+				(ANIMATE_VALUE_NORMAL_BEGIN + ANIMATE_VALUE_TOUCHING) / 2,
+				ANIMATE_VALUE_TOUCHING, 
+				(ANIMATE_VALUE_TOUCHING + ANIMATE_VALUE_NORMAL_END) / 2, 
+				ANIMATE_VALUE_NORMAL_END
+			],
+			outputRange: [
+				COLOR_INCORRECT,
+				COLOR_NORMAL, 
+				COLOR_TOUCHING, 
+				COLOR_TOUCHING, 
+				COLOR_TOUCHING,
+				COLOR_NORMAL],
+		});
+		const animatedStyle = {
+			backgroundColor: interpolatedColor,
+		};
 
 		return (
 			<TouchableHighlight 
 				onPress={ () => this.props.onUpdate(this.props.gridId) } 
 				disabled={ !this.state.enableTouchGrid }
-				onShowUnderlay={ () => this.setColor(BG_COLOR_TOUCHING) }
-				onHideUnderlay={ () => this.setColor(BG_COLOR_NORMAL) } 
+				onShowUnderlay={ () => this.setColor(ANIMATE_VALUE_TOUCHING) }
+				onHideUnderlay={ () => this.setColor(ANIMATE_VALUE_NORMAL_BEGIN) } 
 			>
-				<View style={[gridStyle, styles.grid]}></View>
+				<Animated.View style={[styles.grid, animatedStyle]}></Animated.View>
 			</TouchableHighlight>
 			
 		);
 	}
 }
 
-export default class GridGame extends Component<Props> {
+export default class GridGame extends Component {
 	static navigationOptions = {
 		title: 'Grid Game'
 	};
@@ -194,17 +193,6 @@ export default class GridGame extends Component<Props> {
 	  		14: 6, 
 	  		15: 3, 
 	  		16: 2,
-	  	},
-	  	changeColorGrids: {
-	  		1: false,
-	  		2: false,
-	  		3: false,
-	  		4: false,
-	  		5: false,
-	  		6: false,
-	  		7: false,
-	  		8: false,
-	  		9: false,
 	  	},
 	  	status: STATUS_SHOWING,
 		btnControlText: '',
@@ -248,9 +236,9 @@ export default class GridGame extends Component<Props> {
 	}
 
 	setStatus(status) {
-		this.setState(previousState => ({
+		this.setState({
 				status: status,
-			}));
+			});
 
 		for (let i = 1; i <= this.state.numbers; i++) {
 			this.refs[i].setStatus(status);
@@ -286,33 +274,23 @@ export default class GridGame extends Component<Props> {
 	async setShowingStatus() {
 		let changeColorGridsTime = setInterval(()=>{
 			if (this.state.status == STATUS_SHOWING) {
-				if (this.state.currentNumber > 1) {
-					this.setState(previousState => ({
-						changeColorGrids: Object.assign({}, previousState.changeColorGrids, {
-					     	[previousState.steps[previousState.currentNumber - 1]]: false,
-					    }),
-					}))
-				}
 				if (this.state.currentNumber > this.state.stepsNumber) {
 					this.setStatus(STATUS_ANSWERING);
+				} else {
+					this.refs[this.state.steps[this.state.currentNumber]].animateGrid();
+					this.setState(previousState => ({
+						currentNumber: previousState.currentNumber + 1,
+					}))
 				}
-				this.setState(previousState => ({
-					changeColorGrids: Object.assign({}, previousState.changeColorGrids, {
-				     	[previousState.steps[previousState.currentNumber]]: true,
-				    }),
-					currentNumber: previousState.currentNumber + 1,
-				}))
 			}
 		}, this.state.stepDuration);
 
 		await this.setState({
 			changeColorGridsTime: changeColorGridsTime,
 		});
-		console.log(this.state.changeColorGridsTime);
 	}
 
 	setAnsweringStatus() {
-		console.log(this.state.changeColorGridsTime);
 		clearInterval(this.state.changeColorGridsTime);
 	}
 
@@ -330,7 +308,6 @@ export default class GridGame extends Component<Props> {
 					<Grid key={ i } 
 						ref={ i } 
 						gridId={ i } 
-						changeColor={ this.state.changeColorGrids[i] } 
 						onUpdate={ this.checkCorrection.bind(this) }
 					/>
 				);
@@ -345,7 +322,7 @@ export default class GridGame extends Component<Props> {
 			}));
 
 		if (gridId != this.state.steps[this.state.currentCheckedNumber]) {
-			this.refs[gridId].setColor(BG_COLOR_INCORRECT);
+			this.refs[gridId].setColor(ANIMATE_VALUE_INCORRECT);
 			this.setStatus(STATUS_FINISH);
 		} else {
 			if (this.state.currentCheckedNumber == this.state.stepsNumber) {
@@ -375,16 +352,12 @@ export default class GridGame extends Component<Props> {
 	}
 
 	async setUpLevel() {
-		console.log('setup-level');
 		this.setStepDuration();
 		this.setStepsNumber();
 		this.setSteps();
-
-		console.log(this.state);
 	}
 
 	setStepDuration() {
-		console.log('get-duration');
 		let rate = 0;
 		let levelRate = parseInt(this.state.level / 2);
 		switch (levelRate) {
@@ -403,7 +376,6 @@ export default class GridGame extends Component<Props> {
     }
 
     setStepsNumber() {
-    	console.log('get-steps-number');
     	let stepsNumber = MIN_STEPS_NUMBER;
 
     	if (this.state.level != 1) {
@@ -416,7 +388,6 @@ export default class GridGame extends Component<Props> {
     }
 
     setSteps() {
-    	console.log('get-steps');
 		let steps = {};
         
         for (let i = 1; i <= this.state.stepsNumber; i++) {
