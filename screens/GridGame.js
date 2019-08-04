@@ -7,6 +7,7 @@ import {
 	TouchableOpacity,
 	TouchableHighlight,
 } from 'react-native';
+import { Font } from 'expo';
 
 const STATUS_START = 1;
 const STATUS_SHOWING = 2;
@@ -14,13 +15,9 @@ const STATUS_ANSWERING = 3;
 const STATUS_WAITING = 4;
 const STATUS_FINISH = 5;
 
-const BG_COLOR_NORMAL = 1;
-const BG_COLOR_TOUCHING = 2;
-const BG_COLOR_INCORRECT = 3;
-
-const RATE_STEP_DURATION = 20;
-const MAX_STEP_DURATION = 2000;
-const MIN_STEP_DURATION = 500;
+const RATE_STEP_DURATION = 50;
+const MAX_STEP_DURATION = 1600;
+const MIN_STEP_DURATION = 800;
 
 const MIN_STEPS_NUMBER = 5;
 const MIN_GRID = 1;
@@ -30,15 +27,99 @@ const COLOR_NORMAL = '#17a2b8';
 const COLOR_TOUCHING = '#ffc107';
 const COLOR_INCORRECT = '#ff0000';
 
-const ANIMATE_GRID_DURATION = 1000;
+const ANIMATE_GRID_DURATION = 800;
 const ANIMATE_VALUE_NORMAL_BEGIN = 0;
 const ANIMATE_VALUE_NORMAL_END = 400;
 const ANIMATE_VALUE_TOUCHING = 200;
 const ANIMATE_VALUE_INCORRECT = -1;
 
+const NOTICE_WIN = 1;
+const NOTICE_LOSE = 2;
+
+const ANIMATE_NOTICE_DURATION = 2000;
+const ANIMATE_NOTICE_MIN_VALUE = 10;
+const ANIMATE_NOTICE_MAX_VALUE = 50;
+
+class Notice extends Component {
+	state = {
+		message: '',
+		fontLoaded: false,
+		animateFontSizeValue: new Animated.Value(ANIMATE_NOTICE_MIN_VALUE),
+		isShowed: false,
+		noticeColor: '',
+	};
+
+	noticeText = {
+		[NOTICE_WIN]: 'Level up',
+		[NOTICE_LOSE]: 'Failure',
+	}
+
+	noticeColor = {
+		[NOTICE_WIN]: 'yellow',
+		[NOTICE_LOSE]: 'red',
+	}
+
+	constructor() {
+		super();
+		this.hideNotice = this.hideNotice.bind(this);
+	}
+
+	componentDidMount() {
+		Font.loadAsync({
+			'ballo-chettan': require('../assets/fonts/BalooChettan-Regular.ttf'),
+			'bree-serif': require('../assets/fonts/BalooChettan-Regular.ttf'),
+		}).then( () => this.setState({ 'fontLoaded': true }) );
+	}
+
+	animateNotice() {
+		Animated.timing(this.state.animateFontSizeValue, {
+			'toValue': ANIMATE_NOTICE_MAX_VALUE,
+			'duration': ANIMATE_NOTICE_DURATION,
+		}).start();
+	}
+
+	showNotice(notice) {
+		this.setState({
+			isShowed: true,
+			message: this.noticeText[notice],
+			noticeColor: this.noticeColor[notice],
+		});
+		
+		this.animateNotice();
+	}
+
+	hideNotice() {
+		this.setState({
+			isShowed: false,
+			animateFontSizeValue: new Animated.Value(ANIMATE_NOTICE_MIN_VALUE),
+		});
+	}
+
+	render() {
+		const animateFontSizeStyle = {
+			'fontSize': this.state.animateFontSizeValue,
+		};
+
+		const noticeColorStyle = {
+			'color': this.state.noticeColor,
+		}
+
+		return(
+			this.state.isShowed ? (
+				<TouchableOpacity style = { styles.notice } onPress = { this.hideNotice }>
+					{
+						this.state.fontLoaded ? (
+							<Animated.Text style = { [styles.notice_text, animateFontSizeStyle, noticeColorStyle] }>{ this.state.message }</Animated.Text>
+						) : null
+					}
+				</TouchableOpacity>
+			) : null
+		);
+	}
+}
+
 class Grid extends Component {
 	state = {
-		bgColor: BG_COLOR_NORMAL,
 		duration: 20,
 		enableTouchGrid: false,
 		status: STATUS_START,
@@ -67,9 +148,7 @@ class Grid extends Component {
 	}
 
 	setColor(color) {
-		console.log('grid-color: ' + color);
 		if (this.state.status != STATUS_FINISH || color == ANIMATE_VALUE_INCORRECT) {
-			console.log('grid-status: ' + this.state.status);
 			this.setState({
 				animatedColor: new Animated.Value(color),
 			});
@@ -77,7 +156,6 @@ class Grid extends Component {
 	}
 
 	async setStatus(status) {
-		console.log(status);
 		await this.setState({
 			'status': status
 		});
@@ -156,7 +234,6 @@ class Grid extends Component {
 			>
 				<Animated.View style={[styles.grid, animatedStyle]}></Animated.View>
 			</TouchableHighlight>
-			
 		);
 	}
 }
@@ -167,7 +244,7 @@ export default class GridGame extends Component {
 	};
 
 	constructor(props) {
-	  super(props);
+		super(props);
 	
 	  this.state = {
 	  	level: 1,
@@ -197,16 +274,16 @@ export default class GridGame extends Component {
 	  	status: STATUS_SHOWING,
 		btnControlText: '',
 		changeColorGridsTime: '',
-		test: 0,
-	  };
+		showedNotice: false,
+	};
 
-	  this.btnControlText = {
-	  	[STATUS_START]: 'Start',
-	  	[STATUS_SHOWING]: 'Showing',
-	  	[STATUS_ANSWERING]: 'Answering',
-	  	[STATUS_WAITING]: 'Continue',
-	  	[STATUS_FINISH]: 'Restart',
-	  };
+		this.btnControlText = {
+			[STATUS_START]: 'Start',
+			[STATUS_SHOWING]: 'Showing',
+			[STATUS_ANSWERING]: 'Answering',
+			[STATUS_WAITING]: 'Continue',
+			[STATUS_FINISH]: 'Restart',
+		};
 	}
 
 	componentDidMount() {
@@ -295,9 +372,11 @@ export default class GridGame extends Component {
 	}
 
 	setWaitingStatus() {
+		this.showNotice(NOTICE_WIN);
 	}
 
 	setFinishStatus() {
+		this.showNotice(NOTICE_LOSE);
 	}
 
 	createGrids() {
@@ -358,20 +437,11 @@ export default class GridGame extends Component {
 	}
 
 	setStepDuration() {
-		let rate = 0;
-		let levelRate = parseInt(this.state.level / 2);
-		switch (levelRate) {
-			case 1: rate = 0; break;
-			case 2: rate = 1; break;
-			case 3: rate = 2; break;
-			case 4: rate = 3; break;
-			case 5: rate = 4; break;
-			case 6: rate = 5; break;
-			default: rate = 5; break;
-		}
+		let stepDuration = MAX_STEP_DURATION - RATE_STEP_DURATION * this.state.level;
+		stepDuration = stepDuration > MIN_STEP_DURATION ? stepDuration : MIN_STEP_DURATION;
 
 		this.setState({
-			stepDuration: MAX_STEP_DURATION - RATE_STEP_DURATION * rate,
+			stepDuration: stepDuration,
 		});
     }
 
@@ -399,11 +469,16 @@ export default class GridGame extends Component {
 		});
 	}
 
+	showNotice(notice) {
+		this.refs.notice.showNotice(notice);
+	}
+
 	render() {
 		let grids = this.createGrids();
 
 		return (
-			<View style={styles.container}>
+			<View style = {styles.container}>
+				<Notice ref = "notice"/>
 				<View style = { styles.score_area_bound }>
 					<View style = { styles.score_area }>
 						<Text style = { styles.level }>Level: { this. state.level }</Text>
@@ -434,6 +509,7 @@ const styles = {
 	container: {
 		width: '100%',
 		height: '100%',
+		position: 'relative',
 	},
     score_area_bound: {
     	alignItems: 'center',
@@ -457,7 +533,6 @@ const styles = {
         alignItems: 'center',
         alignContent: 'center',
   		backgroundColor: '#6c757d',
-  		// padding: 10,
   		flexWrap: 'wrap',
   		width: '90%',
         aspectRatio: 1 / 1,
@@ -465,12 +540,10 @@ const styles = {
     },
     grid: {
     	width: '30%',
-    	// height: 100,
     	aspectRatio: 1 / 1,
         borderColor: 'black',
         borderWidth: 1,
         borderStyle: 'solid',
-        // position: 'relative',
     },
     level: {
     	fontSize: 20,
@@ -490,8 +563,9 @@ const styles = {
 		backgroundColor: 'red',
     },
     btn_area_bound: {
-    	marginTop: 30,
-    	alignItems: 'center',
+		alignItems: 'center',
+		justifyContent: 'center',
+		height: '20%',
     },
     btn_control: {
     	paddingTop: 10,
@@ -507,5 +581,19 @@ const styles = {
     btn_control_text: {
 		fontSize: 20,
     	fontWeight: 'bold', 
-    },
+	},
+	notice: {
+		zIndex: 2,
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		width: '100%',
+		height: '100%',
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: 'rgba(0,0,0,0.4)',
+	},
+	notice_text: {
+		fontFamily: 'ballo-chettan',
+	}
 };
