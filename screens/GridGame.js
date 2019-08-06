@@ -26,6 +26,7 @@ const MAX_GRID = 9;
 const COLOR_NORMAL = '#17a2b8';
 const COLOR_TOUCHING = '#ffc107';
 const COLOR_INCORRECT = '#ff0000';
+const COLOR_GRAY = '#6c757d';
 
 const ANIMATE_GRID_DURATION = 800;
 const ANIMATE_VALUE_NORMAL_BEGIN = 0;
@@ -36,9 +37,15 @@ const ANIMATE_VALUE_INCORRECT = -1;
 const NOTICE_WIN = 1;
 const NOTICE_LOSE = 2;
 
-const ANIMATE_NOTICE_DURATION = 2000;
+const ANIMATE_NOTICE_DURATION = 1000;
 const ANIMATE_NOTICE_MIN_VALUE = 10;
 const ANIMATE_NOTICE_MAX_VALUE = 50;
+const ANIMATE_NOTICE_OFF_TIMEOUT = 1000;
+
+const ANIMATE_BORDER_DURATION = 1000;
+const ANIMATE_BORDER_ONE = 0;
+const ANIMATE_BORDER_TWO = 200;
+const ANIMATE_BORDER_THREE = 400;
 
 class Notice extends Component {
 	state = {
@@ -50,8 +57,8 @@ class Notice extends Component {
 	};
 
 	noticeText = {
-		[NOTICE_WIN]: 'Level up',
-		[NOTICE_LOSE]: 'Failure',
+		[NOTICE_WIN]: 'Correct',
+		[NOTICE_LOSE]: 'Incorrect',
 	}
 
 	noticeColor = {
@@ -71,11 +78,11 @@ class Notice extends Component {
 		}).then( () => this.setState({ 'fontLoaded': true }) );
 	}
 
-	animateNotice() {
+	animateNotice(notice) {
 		Animated.timing(this.state.animateFontSizeValue, {
 			'toValue': ANIMATE_NOTICE_MAX_VALUE,
 			'duration': ANIMATE_NOTICE_DURATION,
-		}).start();
+		}).start(() => setTimeout(() => this.hideNotice(notice), ANIMATE_NOTICE_OFF_TIMEOUT));
 	}
 
 	showNotice(notice) {
@@ -85,14 +92,18 @@ class Notice extends Component {
 			noticeColor: this.noticeColor[notice],
 		});
 		
-		this.animateNotice();
+		this.animateNotice(notice);
 	}
 
-	hideNotice() {
+	hideNotice(notice) {
 		this.setState({
 			isShowed: false,
 			animateFontSizeValue: new Animated.Value(ANIMATE_NOTICE_MIN_VALUE),
 		});
+
+		if (notice == NOTICE_WIN) {
+			this.props.continue();
+		}
 	}
 
 	render() {
@@ -106,13 +117,13 @@ class Notice extends Component {
 
 		return(
 			this.state.isShowed ? (
-				<TouchableOpacity style = { styles.notice } onPress = { this.hideNotice }>
+				<View style = { styles.notice }>
 					{
 						this.state.fontLoaded ? (
 							<Animated.Text style = { [styles.notice_text, animateFontSizeStyle, noticeColorStyle] }>{ this.state.message }</Animated.Text>
 						) : null
 					}
-				</TouchableOpacity>
+				</View>
 			) : null
 		);
 	}
@@ -187,6 +198,7 @@ class Grid extends Component {
 	}
 
 	async setShowingStatus() {
+		this.setColor(ANIMATE_VALUE_NORMAL_BEGIN);
 		this.enableTouchGrid(false);
 	}
 
@@ -246,36 +258,37 @@ export default class GridGame extends Component {
 	constructor(props) {
 		super(props);
 	
-	  this.state = {
-	  	level: 1,
-	  	stepDuration: 100,
-	  	numbers: 9,
-	  	stepsNumber: 16,
-	  	currentNumber: 1,
-	  	currentCheckedNumber: 0,
-	  	steps: {
-	  		1: 1, 
-	  		2: 2, 
-	  		3: 3, 
-	  		4: 6, 
-	  		5: 9, 
-	  		6: 8, 
-	  		7: 7, 
-	  		8: 4, 
-	  		9: 5,
-	  		10: 4, 
-	  		11: 7, 
-	  		12: 8, 
-	  		13: 9, 
-	  		14: 6, 
-	  		15: 3, 
-	  		16: 2,
-	  	},
-	  	status: STATUS_SHOWING,
-		btnControlText: '',
-		changeColorGridsTime: '',
-		showedNotice: false,
-	};
+	  	this.state = {
+			level: 1,
+			stepDuration: 100,
+			numbers: 9,
+			stepsNumber: 16,
+			currentNumber: 1,
+			currentCheckedNumber: 0,
+			steps: {
+				1: 1, 
+				2: 2, 
+				3: 3, 
+				4: 6, 
+				5: 9, 
+				6: 8, 
+				7: 7, 
+				8: 4, 
+				9: 5,
+				10: 4, 
+				11: 7, 
+				12: 8, 
+				13: 9, 
+				14: 6, 
+				15: 3, 
+				16: 2,
+			},
+			status: STATUS_SHOWING,
+			btnControlText: '',
+			changeColorGridsTime: '',
+			showedNotice: false,
+			animatedBorderColor: new Animated.Value(ANIMATE_BORDER_ONE),
+		};
 
 		this.btnControlText = {
 			[STATUS_START]: 'Start',
@@ -296,13 +309,11 @@ export default class GridGame extends Component {
 		}
 
 		if (this.state.status == STATUS_WAITING) {
-			await this.continue();
-			this.setStatus(STATUS_SHOWING)
+			this.continue();
 		}
 
 		if (this.state.status == STATUS_FINISH) {
-			await this.start();
-			this.setStatus(STATUS_START);
+			this.continue();
 		}
 	}
 
@@ -312,8 +323,8 @@ export default class GridGame extends Component {
 		});
 	}
 
-	setStatus(status) {
-		this.setState({
+	async setStatus(status) {
+		await this.setState({
 				status: status,
 			});
 
@@ -345,10 +356,12 @@ export default class GridGame extends Component {
 	}
 
 	setStartStatus() {
-		this.start();
+		this.setUpLevel();
 	}
 
 	async setShowingStatus() {
+		this.animateBorder();
+
 		let changeColorGridsTime = setInterval(()=>{
 			if (this.state.status == STATUS_SHOWING) {
 				if (this.state.currentNumber > this.state.stepsNumber) {
@@ -368,6 +381,7 @@ export default class GridGame extends Component {
 	}
 
 	setAnsweringStatus() {
+		this.animateBorder();
 		clearInterval(this.state.changeColorGridsTime);
 	}
 
@@ -411,26 +425,24 @@ export default class GridGame extends Component {
 	}
 
 	async continue() {
-		await this.setState(previousState => ({
-				'level': previousState.level + 1,
-				'currentNumber': 1,
-				'currentCheckedNumber': 0,
-			}));
-
-		this.setUpLevel();
-	}
-
-	async start() {
-		await this.setState(previousState => ({
-				'level': 1,
-				'currentNumber': 1,
-				'currentCheckedNumber': 0,
-			}));
-
 		await this.setUpLevel();
+		await this.setStatus(STATUS_SHOWING);
 	}
 
 	async setUpLevel() {
+		let level = 0;
+		if (this.state.status != STATUS_FINISH && this.state.status != STATUS_START) {
+			level = this.state.level + 1;
+		} else {
+			level = 1;
+		}
+		console.log(level);
+		await this.setState({
+			'level': level,
+			'currentNumber': 1,
+			'currentCheckedNumber': 0,
+		});
+
 		this.setStepDuration();
 		this.setStepsNumber();
 		this.setSteps();
@@ -473,12 +485,26 @@ export default class GridGame extends Component {
 		this.refs.notice.showNotice(notice);
 	}
 
+	animateBorder() {
+		Animated.timing(this.state.animatedBorderColor, {
+			toValue: ANIMATE_BORDER_THREE,
+			duration: ANIMATE_BORDER_DURATION,
+		}).start(() => { this.setState({ animatedBorderColor: new Animated.Value(ANIMATE_BORDER_ONE) }) });
+	}
+
 	render() {
 		let grids = this.createGrids();
+		const interpolatedBorderColor = this.state.animatedBorderColor.interpolate({
+			inputRange: [ ANIMATE_BORDER_ONE, ANIMATE_BORDER_TWO, ANIMATE_BORDER_THREE ],
+			outputRange: [ COLOR_GRAY, COLOR_TOUCHING, COLOR_GRAY ],
+		});
+		const animatedBorderStyle = {
+			backgroundColor: interpolatedBorderColor,
+		};
 
 		return (
 			<View style = {styles.container}>
-				<Notice ref = "notice"/>
+				<Notice ref = "notice" continue = { this.continue.bind(this) }/>
 				<View style = { styles.score_area_bound }>
 					<View style = { styles.score_area }>
 						<Text style = { styles.level }>Level: { this. state.level }</Text>
@@ -487,9 +513,9 @@ export default class GridGame extends Component {
 				</View>
 				
 				<View style = { styles.grid_area_bound }>
-					<View style={styles.grid_area}>
+					<Animated.View style={ [styles.grid_area, animatedBorderStyle] }>
 						{ grids }
-					</View>
+					</Animated.View>
 				</View>
 				
 				<View style = { styles.btn_area_bound}>
@@ -532,7 +558,7 @@ const styles = {
  		justifyContent: 'center',
         alignItems: 'center',
         alignContent: 'center',
-  		backgroundColor: '#6c757d',
+  		// backgroundColor: '#6c757d',
   		flexWrap: 'wrap',
   		width: '90%',
         aspectRatio: 1 / 1,
